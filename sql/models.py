@@ -13,6 +13,7 @@ class users(AbstractUser):
     display = models.CharField('显示的中文名', max_length=50)
     role = models.CharField('角色', max_length=20, choices=(('工程师', '工程师'), ('审核人', '审核人'), ('DBA', 'DBA')), default='工程师')
     is_ldapuser = models.BooleanField('ldap用戶', default=False)
+    outer_id = models.CharField('企业微信用户ID', max_length=15, default='')
 
     def __str__(self):
         return self.username
@@ -30,6 +31,7 @@ class master_config(models.Model):
     master_password = models.CharField('登录主库的密码', max_length=300)
     create_time = models.DateTimeField('创建时间', auto_now_add=True)
     update_time = models.DateTimeField('更新时间', auto_now=True)
+    is_product = models.IntegerField('是否是生产数据库', choices=((0, '否'), (1, '是')), default=0)
 
     def __str__(self):
         return self.cluster_name
@@ -53,16 +55,18 @@ class workflow(models.Model):
     finish_time = models.DateTimeField('结束时间', null=True, blank=True)
     status = models.CharField(max_length=50, choices=(
         ('已正常结束', '已正常结束'), ('人工终止流程', '人工终止流程'), ('自动审核中', '自动审核中'), ('等待审核人审核', '等待审核人审核'), ('审核通过', '审核通过'),
-        ('定时执行', '定时执行'), ('执行中', '执行中'), ('自动审核不通过', '自动审核不通过'), ('执行有异常', '执行有异常')))
+        ('执行中', '执行中'), ('自动审核不通过', '自动审核不通过'), ('执行有异常', '执行有异常')))
     # is_backup = models.IntegerField('是否备份，0为否，1为是', choices=((0,0),(1,1)))
     is_backup = models.CharField('是否备份', choices=(('否', '否'), ('是', '是')), max_length=20)
     review_content = models.TextField('自动审核内容的JSON格式')
     cluster_name = models.CharField('集群名称', max_length=50)
     reviewok_time = models.DateTimeField('人工审核通过的时间', null=True, blank=True)
     sql_content = models.TextField('具体sql内容')
-    execute_result = models.TextField('执行结果的JSON格式', blank=True)
+    execute_result = models.TextField('执行结果的JSON格式')
     is_manual = models.IntegerField('是否手工执行', choices=((0, '否'), (1, '是')), default=0)
-    audit_remark = models.TextField('审核备注', null=True, blank=True)
+    audit_remark = models.TextField('审核备注', null=True)
+    is_data_modified = models.IntegerField('是否是数据订正', choices=((0, '否'), (1, '是')), default=0)
+    email_cc = models.CharField('邮件抄送人', max_length=100, null=True)
 
     def __str__(self):
         return self.workflow_name
@@ -81,6 +85,7 @@ class slave_config(models.Model):
     slave_password = models.CharField('登录从库的密码', max_length=300)
     create_time = models.DateTimeField('创建时间', auto_now_add=True)
     update_time = models.DateTimeField('更新时间', auto_now=True)
+    is_product = models.IntegerField('是否是生产数据库', choices=((0, '否'), (1, '是')), default=1)
 
     class Meta:
         verbose_name = u'从库地址配置'
@@ -187,7 +192,7 @@ class QueryPrivileges(models.Model):
     db_name = models.CharField('数据库', max_length=200)
     table_name = models.CharField('表', max_length=200)
     valid_date = models.DateField('有效时间')
-    limit_num = models.IntegerField('行数限制', default=100)
+    limit_num = models.IntegerField('行数限制', default=10)
     priv_type = models.IntegerField('权限类型', choices=((1, 'DATABASE'), (2, 'TABLE'),), default=0)
     is_deleted = models.IntegerField('是否删除', default=0)
     create_time = models.DateTimeField(auto_now_add=True)
@@ -223,7 +228,7 @@ class QueryLog(models.Model):
 class DataMaskingColumns(models.Model):
     column_id = models.AutoField('字段id', primary_key=True)
     rule_type = models.IntegerField('规则类型',
-                                    choices=((1, '手机号'), (2, '证件号码'), (3, '银行卡'), (4, '邮箱'), (5, '金额'), (6, '其他')))
+                                    choices=((1, '手机号'), (2, '证件号码'), (3, '银行卡'), (4, '邮箱'), (5, '金额')))
     active = models.IntegerField('激活状态', choices=((0, '未激活'), (1, '激活')))
     cluster_name = models.CharField('集群名称', max_length=50)
     table_schema = models.CharField('字段所在库名', max_length=64)
@@ -242,7 +247,7 @@ class DataMaskingColumns(models.Model):
 # 脱敏规则配置
 class DataMaskingRules(models.Model):
     rule_type = models.IntegerField('规则类型',
-                                    choices=((1, '手机号'), (2, '证件号码'), (3, '银行卡'), (4, '邮箱'), (5, '金额'), (6, '其他')), unique=True)
+                                    choices=((1, '手机号'), (2, '证件号码'), (3, '银行卡'), (4, '邮箱'), (5, '金额')), unique=True)
     rule_regex = models.CharField('规则脱敏所用的正则表达式，表达式必须分组，隐藏的组会使用****代替', max_length=255)
     hide_group = models.IntegerField('需要隐藏的组')
     rule_desc = models.CharField('规则描述', max_length=100, default='', blank=True)
@@ -290,7 +295,7 @@ class AliyunRdsConfig(models.Model):
 
 # SlowQuery
 class SlowQuery(models.Model):
-    checksum = models.CharField(max_length=32, primary_key=True)
+    checksum = models.BigIntegerField(primary_key=True)
     fingerprint = models.TextField()
     sample = models.TextField()
     first_seen = models.DateTimeField(blank=True, null=True)
@@ -408,7 +413,21 @@ class SlowQueryHistory(models.Model):
     class Meta:
         managed = False
         db_table = 'mysql_slow_query_review_history'
-        unique_together = ('checksum', 'ts_min', 'ts_max')
-        index_together = ('hostname_max', 'ts_min')
+        unique_together = ('hostname_max', 'ts_min')
         verbose_name = u'慢日志明细'
         verbose_name_plural = u'慢日志明细'
+
+
+# 数据源管理
+class datasource(models.Model):
+    app_name = models.CharField('应用名称', max_length=50)
+    env = models.CharField('环境', max_length=50)
+    db_name = models.CharField('库名', max_length=50)
+    ip_addr = models.CharField('IP', max_length=50)
+    port = models.CharField('端口', max_length=50)
+    username = models.CharField('用户名', max_length=50)
+    password = models.CharField('密码', max_length=50)
+
+    class Meta:
+        verbose_name = u'数据源管理'
+        verbose_name_plural = u'数据源管理'
