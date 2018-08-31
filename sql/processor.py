@@ -19,15 +19,26 @@ leftMenuBtnsCommon = (
 leftMenuBtnsSuper = (
     {'key': 'diagnosis', 'name': '主库会话管理', 'url': '/diagnosis_process/', 'class': 'glyphicon  glyphicon-scissors',
      'display': True},
-    {'key': 'admin', 'name': '后台数据管理', 'url': '/admin/sql/', 'class': 'glyphicon glyphicon-list', 'display': True},
+    {'key': 'admin', 'name': '后台数据管理', 'url': '/admin/', 'class': 'glyphicon glyphicon-list', 'display': True},
 )
 
 leftMenuBtnsDoc = (
     {'key': 'dbaprinciples', 'name': 'SQL审核必读', 'url': '/dbaprinciples/', 'class': 'glyphicon glyphicon-book',
      'display': True},
     {'key': 'charts', 'name': '统计图表展示', 'url': '/charts/', 'class': 'glyphicon glyphicon-file', 'display': True},
+    {'key': 'datasource', 'name': '数据源管理', 'url': '/alldatasource/', 'class': 'glyphicon glyphicon-cloud',
+     'display': True},
 )
 
+leftMenuBtnsDBA = (
+    {'key': 'maintenance', 'name': '数据库运维', 'url': '/maintenance/', 'class': 'glyphicon glyphicon-leaf',
+     'display': True},
+)
+
+leftMenuBtnsDBADetail = (
+    {'key': 'dbbackup', 'name': '备份管理', 'url': '/dbbackup/', 'class': 'glyphicon glyphicon-grain',
+     'display': True},
+)
 
 def global_info(request):
     """存放用户，会话信息等."""
@@ -39,8 +50,13 @@ def global_info(request):
             UserDisplay = loginUser
         if user.is_superuser:
             leftMenuBtns = leftMenuBtnsCommon + leftMenuBtnsSuper + leftMenuBtnsDoc
+            leftMenuBtnsMaintenance = ()
+        elif user.role == 'DBA':
+            leftMenuBtns = leftMenuBtnsCommon + leftMenuBtnsDoc + leftMenuBtnsDBA
+            leftMenuBtnsMaintenance = leftMenuBtnsDBADetail
         else:
             leftMenuBtns = leftMenuBtnsCommon + leftMenuBtnsDoc
+            leftMenuBtnsMaintenance = ()
         # 获取代办数量
         try:
             todo = Workflow().auditlist(user, 0, 0, 1)['data']['auditlistCount']
@@ -48,12 +64,14 @@ def global_info(request):
             todo = 0
     else:
         leftMenuBtns = ()
+        leftMenuBtnsMaintenance = ()
         UserDisplay = ''
         todo = 0
 
     return {
         'loginUser': loginUser,
         'leftMenuBtns': leftMenuBtns,
+        'leftMenuBtnsMaintenance': leftMenuBtnsMaintenance,
         'UserDisplay': UserDisplay,
         'todo': todo
     }
