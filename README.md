@@ -9,10 +9,12 @@
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/wechat.png)
 
 
+
 * 优化提交工单页面载入速度和后台逻辑，这样配置大量数据库也很快进入SQL提交页面。  
   将同步加载改为使用AJAX后台进行异步加载。
   
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/SQLsubmit.png)
+
 
 
 * 加入数据源管理  
@@ -20,9 +22,11 @@
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/datasource.png)
 
 
+
 * 增加抄送人功能  
 
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/cc.png)
+
 
 
 * 增加了复制监控功能  
@@ -31,10 +35,12 @@
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/replication.png)
 
 
+
 * 开发组长和DBA的审核人窗口分开  
 
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/auditor1.png)
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/auditor2.png)
+
 
 
 * 所有DBA均可执行工单审核  
