@@ -25,7 +25,7 @@
 
 ## 根据公司的需求，二次开发的功能
 * 企业微信推送
-
+![](https://github.com/real-fire/archer/blob/master/src/screenshots/wechat.png)
 
 
 ## 主要功能
