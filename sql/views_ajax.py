@@ -27,7 +27,7 @@ from .dao import Dao
 from .const import Const, WorkflowDict
 from .inception import InceptionDao
 from .aes_decryptor import Prpcrypt
-from .models import users, master_config, workflow, AliyunRdsConfig
+from .models import users, master_config, workflow, datasource
 from sql.sendmail import MailSender
 import logging
 from .workflow import Workflow
@@ -35,8 +35,7 @@ from .extend_json_encoder import ExtendJSONEncoder
 
 if settings.ALIYUN_RDS_MANAGE:
     from .aliyun_function import process_status as aliyun_process_status, \
-        create_kill_session as aliyun_create_kill_session, kill_session as aliyun_kill_session, \
-        sapce_status as aliyun_sapce_status
+        create_kill_session as aliyun_create_kill_session, kill_session as aliyun_kill_session
 
 logger = logging.getLogger('default')
 mailSender = MailSender()
@@ -94,6 +93,8 @@ def loginAuthenticate(username, password):
                     # 上一次登录失败时间早于5分钟前，则重新计数。以达到超过5分钟自动解锁的目的。
                     login_failure_counter[username]["cnt"] = 1
                 login_failure_counter[username]["last_failure_time"] = datetime.datetime.now()
+            # log_mail_record(
+                # 'user:{},login failed, fail count:{}'.format(username, login_failure_counter[username]["cnt"]))
             result = {'status': 1, 'msg': '用户名或密码错误，请重新输入！', 'data': ''}
     return result
 
@@ -122,6 +123,11 @@ def authenticateEntry(request):
                 replace_info.password = make_password(password)
                 replace_info.is_ldapuser = 1
                 replace_info.save()
+
+        # 调用了django内置登录方法，防止管理后台二次登录
+        user = authenticate(username=username, password=password)
+        if user:
+            login(request, user)
 
         # session保存用户信息
         request.session['login_username'] = username
@@ -384,9 +390,11 @@ def stopOscProgress(request):
     if workflowDetail.status != Const.workflowStatus['executing']:
         context = {"status": -1, "msg": '当前工单状态不是"执行中"，请刷新当前页面！', "data": ""}
         return HttpResponse(json.dumps(context), content_type='application/json')
-    if loginUser is None or loginUser not in listAllReviewMen:
-        context = {"status": -1, 'msg': '当前登录用户不是审核人，请重新登录.', "data": ""}
-        return HttpResponse(json.dumps(context), content_type='application/json')
+    listDBA = [username['username'] for username in users.objects.filter(role='DBA').values('username')]
+    if loginUser not in listDBA:
+        if loginUser is None or loginUser not in listAllReviewMen:
+            context = {'errMsg': '当前登录用户不是审核人，请重新登录.'}
+            return render(request, 'error.html', context)
 
     workflowId = int(workflowId)
     sqlID = int(sqlID)
@@ -494,11 +502,8 @@ def process_status(request):
 
     base_sql = "select id, user, host, db, command, time, state, ifnull(info,'') as info from information_schema.processlist"
     # 判断是RDS还是其他实例
-    if len(AliyunRdsConfig.objects.filter(cluster_name=cluster_name)) > 0:
-        if settings.ALIYUN_RDS_MANAGE:
-            result = aliyun_process_status(request)
-        else:
-            raise Exception('未开启rds管理，无法查看rds数据！')
+    if settings.ALIYUN_RDS_MANAGE:
+        result = aliyun_process_status(request)
     else:
         master_info = master_config.objects.get(cluster_name=cluster_name)
         if command_type == 'All':
@@ -531,11 +536,8 @@ def create_kill_session(request):
 
     result = {'status': 0, 'msg': 'ok', 'data': []}
     # 判断是RDS还是其他实例
-    if len(AliyunRdsConfig.objects.filter(cluster_name=cluster_name)) > 0:
-        if settings.ALIYUN_RDS_MANAGE:
-            result = aliyun_create_kill_session(request)
-        else:
-            raise Exception('未开启rds管理，无法查看rds数据！')
+    if settings.ALIYUN_RDS_MANAGE:
+        result = aliyun_create_kill_session(request)
     else:
         master_info = master_config.objects.get(cluster_name=cluster_name)
         ThreadIDs = ThreadIDs.replace('[', '').replace(']', '')
@@ -559,11 +561,8 @@ def kill_session(request):
 
     result = {'status': 0, 'msg': 'ok', 'data': []}
     # 判断是RDS还是其他实例
-    if len(AliyunRdsConfig.objects.filter(cluster_name=cluster_name)) > 0:
-        if settings.ALIYUN_RDS_MANAGE:
-            result = aliyun_kill_session(request)
-        else:
-            raise Exception('未开启rds管理，无法查看rds数据！')
+    if settings.ALIYUN_RDS_MANAGE:
+        result = aliyun_kill_session(request)
     else:
         master_info = master_config.objects.get(cluster_name=cluster_name)
         kill_sql = request_params
@@ -574,47 +573,37 @@ def kill_session(request):
     return HttpResponse(json.dumps(result), content_type='application/json')
 
 
-# 问题诊断--表空间信息
+# 获取数据源列表
 @csrf_exempt
-@role_required(('DBA',))
-def tablesapce(request):
-    cluster_name = request.POST.get('cluster_name')
+def managedatasource(request):
+    # 获取用户信息
+    loginUser = request.session.get('login_username', False)
 
-    # 判断是RDS还是其他实例
-    if len(AliyunRdsConfig.objects.filter(cluster_name=cluster_name)) > 0:
-        if settings.ALIYUN_RDS_MANAGE:
-            result = aliyun_sapce_status(request)
-        else:
-            raise Exception('未开启rds管理，无法查看rds数据！')
-    else:
-        master_info = master_config.objects.get(cluster_name=cluster_name)
-        sql = '''
-        SELECT
-          table_schema,
-          table_name,
-          engine,
-          TRUNCATE((data_length+index_length+data_free)/1024/1024,2) AS total_size,
-          table_rows,
-          TRUNCATE(data_length/1024/1024,2) AS data_size,
-          TRUNCATE(index_length/1024/1024,2) AS index_size,
-          TRUNCATE(data_free/1024/1024,2) AS data_free,
-          TRUNCATE(data_free/(data_length+index_length+data_free)*100,2) AS pct_free
-        FROM information_schema.tables 
-        WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'test', 'sys')
-          ORDER BY total_size DESC 
-        LIMIT 14;'''.format(cluster_name)
-        table_space = dao.mysql_query(master_info.master_host, master_info.master_port, master_info.master_user,
-                                      prpCryptor.decrypt(master_info.master_password), 'information_schema', sql)
-        column_list = table_space['column_list']
-        rows = []
-        for row in table_space['rows']:
-            row_info = {}
-            for row_index, row_item in enumerate(row):
-                row_info[column_list[row_index]] = row_item
-            rows.append(row_info)
+    limit = int(request.POST.get('limit'))
+    offset = int(request.POST.get('offset'))
+    limit = offset + limit
 
-        result = {'status': 0, 'msg': 'ok', 'data': rows}
+    # 获取搜索参数
+    search = request.POST.get('search')
+    if search is None:
+        search = ''
 
+
+    # 管理员可以看到全部工单，其他人能看到自己提交和审核的工单
+    loginUserOb = users.objects.get(username=loginUser)
+
+    # 全部工单里面包含搜索条件,待审核前置
+    listDatasource = datasource.objects.filter(
+        Q(db_name__contains=search) | Q(ip_addr__contains=search)  | Q(env__contains=search) | Q(app_name__contains=search) | Q(username__contains=search) 
+        ).order_by('-id')[offset:limit].values("id", "app_name", "env", "db_name",
+                                                    "ip_addr", "port", "username", "password")
+    listDatasourceCount = datasource.objects.filter(
+        Q(db_name__contains=search) | Q(ip_addr__contains=search)).count()
+
+    # QuerySet 序列化
+    rows = [row for row in listDatasource]
+    print(rows)
+    result = {"total": listDatasourceCount, "rows": rows}
     # 返回查询结果
     return HttpResponse(json.dumps(result, cls=ExtendJSONEncoder, bigint_as_string=True),
                         content_type='application/json')
