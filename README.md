@@ -3,7 +3,7 @@
 
 
 ## 根据公司的需求，在archer原版基础上，二次开发的功能
-* 企业微信推送
+* 企业微信推送  
   在邮件基础上，使用企业微信来推送SQL审核、执行的流程结果。
   
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/wechat.png)
