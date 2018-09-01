@@ -13,6 +13,13 @@
   
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/SQLsubmit.png)
 
+* 所有DBA均可执行工单审核  
+  工单发起人提交工单给DBA1审核，DBA2可以执行工单审核。
+
+* 加入数据源管理  
+
+
+
 
 ## 主要功能
 * 自动审核  
