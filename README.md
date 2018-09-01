@@ -20,10 +20,15 @@
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/datasource.png)
 
 
-
 * 增加抄送人功能  
 
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/cc.png)
+
+
+* 增加抄送人功能  
+
+![](https://github.com/real-fire/archer/blob/master/src/screenshots/dbamanage.png)
+![](https://github.com/real-fire/archer/blob/master/src/screenshots/replication.png)
 
 
 * 所有DBA均可执行工单审核  
