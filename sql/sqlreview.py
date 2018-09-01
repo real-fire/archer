@@ -11,6 +11,7 @@ from django.conf import settings
 from .dao import Dao
 from .const import Const, WorkflowDict
 from .sendmail import MailSender
+from .sendwechat import WechatSender
 from .inception import InceptionDao
 from .aes_decryptor import Prpcrypt
 from .models import users, workflow, master_config
@@ -25,7 +26,7 @@ inceptionDao = InceptionDao()
 mailSender = MailSender()
 prpCryptor = Prpcrypt()
 workflowOb = Workflow()
-
+wechatSender=WechatSender()
 
 # 获取当前请求url
 def getDetailUrl(request):
@@ -90,9 +91,52 @@ def execute_call_back(workflowId, clusterName, url):
             strContent = "发起人：" + engineer + "\n审核人：" + reviewMen + "\n工单地址：" + url + "\n工单名称： " + workflowName + "\n执行结果：" + workflowStatus
             reviewManAddr = [email['email'] for email in
                              users.objects.filter(username__in=listAllReviewMen).values('email')]
+
+            # 获取抄送人邮件地址
+            workflowDetaiL = workflow.objects.get(id=workflowId)
+            cc_list = json.loads(workflowDetaiL.email_cc)
+            for cc_name in cc_list:
+                cc_name_list = [email['email'] for email in
+                                users.objects.filter(display=str(cc_name)).values('email')]
+                for cc_addr in cc_name_list:
+                    reviewManAddr.append(cc_addr)
+
             dbaAddr = [email['email'] for email in users.objects.filter(role='DBA').values('email')]
             listCcAddr = reviewManAddr + dbaAddr
             mailSender.sendEmail(strTitle, strContent, [objEngineer.email], listCcAddr=listCcAddr)
+
+            # 获取发起人的微信id
+            reviewman_wechat = users.objects.get(username=workflowDetail.engineer)
+            wechat_engineer_userid = reviewman_wechat.outer_id
+            wechat_userid = []
+            wechat_userid.append(wechat_engineer_userid)
+
+            # 获取审核人的微信id
+            reviewman_wechat = users.objects.get(username=listAllReviewMen[0])
+            wechat_auditor_userid = reviewman_wechat.outer_id
+            wechat_userid.append(wechat_auditor_userid)
+
+            # 获取抄送人微信
+            workflowDetaiL = workflow.objects.get(id=workflowId)
+            cc_list = json.loads(workflowDetaiL.email_cc)
+            for cc_name in cc_list:
+                cc_name_list = [outer_id['outer_id'] for outer_id in
+                                users.objects.filter(display=str(cc_name)).values('outer_id')]
+                for cc_addr in cc_name_list:
+                    wechat_userid.append(cc_addr)
+
+            # 发送企业微信
+            wechat_userid = list(filter(lambda x: x != '', wechat_userid))
+
+            if wechat_userid:
+                wechatTitle = "SQL上线工单执行完毕 # " + str(workflowId)
+                Content = "发起人：" + engineer + "\n审核人：" + reviewMen + "\n工单地址：" + url + "\n工单名称： " + workflowName + "\n执行结果：" + workflowStatus
+                wechatContent = "<div class=\"normal\">" + Content  + "</div>"
+
+                # 获取企业微信的access_token
+                Token = wechatSender.GetToken("xxx", "xxx")
+                message = wechatTitle.encode("utf-8") + '\n'.encode('utf8') + wechatContent.encode("utf-8")
+                wechatSender.SendMessage(Token, wechat_userid, wechatTitle.encode("utf-8"), wechatContent.encode("utf-8"), url)
 
 
 # 给定时任务执行sql
