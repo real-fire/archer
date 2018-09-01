@@ -15,6 +15,7 @@ urlpatterns = [
 
     url(r'^autoreview/$', views.autoreview, name='autoreview'),
     url(r'^detail/(?P<workflowId>[0-9]+)/$', views.detail, name='detail'),
+    url(r'^datasourcedetail/(?P<datasourceId>[0-9]+)/$', views.datasourcedetail, name='datasourcedetail'),
     url(r'^passed/$', views.passed, name='passed'),
     url(r'^execute/$', views.execute, name='execute'),
     url(r'^timingtask/$', views.timingtask, name='timingtask'),
@@ -33,9 +34,18 @@ urlpatterns = [
     url(r'^workflowdetail/(?P<audit_id>[0-9]+)/$', views.workflowsdetail, name='workflowsdetail'),
     url(r'^dbaprinciples/$', views.dbaprinciples, name='dbaprinciples'),
     url(r'^charts/$', views.charts, name='charts'),
+    url(r'^alldatasource/$', views.managedatasource, name='Datasource'),
+    url(r'^adddatasource/$', views.adddatasource, name='adddatasource'),
+    url(r'^autodatasource/$', views.autodatasource, name='autodatasource'),
+    url(r'^modifydatasource/$', views.modifydatasource, name='modifydatasource'),
+    url(r'^passwordchange/$', views.passwordchange, name='passwordchange'),
+    url(r'^autopassword/$', views.autopassword, name='autopassword'),
+    url(r'^maintenance/$', views.maintenance, name='maintenance'),
+    url(r'^dbbackup/$', views.dbbackup, name='dbbackup'),
 
     url(r'^authenticate/$', views_ajax.authenticateEntry, name='authenticate'),
     url(r'^sqlworkflow/$', views_ajax.sqlworkflow, name='sqlworkflow'),
+    url(r'^datasource/$', views_ajax.managedatasource, name='datasource'),
     url(r'^simplecheck/$', views_ajax.simplecheck, name='simplecheck'),
     url(r'^getMonthCharts/$', views_ajax.getMonthCharts, name='getMonthCharts'),
     url(r'^getPersonCharts/$', views_ajax.getPersonCharts, name='getPersonCharts'),
@@ -47,6 +57,7 @@ urlpatterns = [
 
     url(r'^getClusterList/$', query.getClusterList, name='getClusterList'),
     url(r'^getdbNameList/$', query.getdbNameList, name='getdbNameList'),
+    url(r'^getEmailCc/$', query.getEmailCc, name='getEmailCc'),
     url(r'^getTableNameList/$', query.getTableNameList, name='getTableNameList'),
     url(r'^getColumnNameList/$', query.getColumnNameList, name='getColumnNameList'),
     url(r'^getqueryapplylist/$', query.getqueryapplylist, name='getqueryapplylist'),
@@ -60,9 +71,17 @@ urlpatterns = [
     url(r'^slowquery_review/$', query.slowquery_review, name='slowquery_review'),
     url(r'^slowquery_review_history/$', query.slowquery_review_history, name='slowquery_review_history'),
     url(r'^process_status/$', views_ajax.process_status, name='process_status'),
-    url(r'^create_kill_session/$', views_ajax.create_kill_session,name='create_kill_session'),
+    url(r'^create_kill_session/$', views_ajax.create_kill_session,
+        name='create_kill_session'),
     url(r'^kill_session/$', views_ajax.kill_session, name='kill_session'),
-    url(r'^sapce_status/$', views_ajax.tablesapce, name='tablesapce'),
     url(r'^del_sqlcronjob/$', jobs.del_sqlcronjob, name='del_sqlcronjob'),
+
 ]
 
+if settings.ALIYUN_RDS_MANAGE:
+    from . import aliyun_function
+
+    aliyun_function_url = [
+        url(r'^sapce_status/$', aliyun_function.sapce_status, name='sapce_status'),
+    ]
+    urlpatterns.extend(aliyun_function_url)
