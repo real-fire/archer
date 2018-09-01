@@ -13,7 +13,7 @@
 <li><a href="#212">2.1.2 表结构</a></li>
 <li><a href="#213">2.1.3 列数据类型优化</a></li>
 <li><a href="#214">2.1.4 索引设计</a></li>
-<li><a href="#215">2.1.5 分库分表、分区表</a></li>
+<li><a href="#215">2.1.5 分库分表</a></li>
 <li><a href="#216">2.1.6 字符集</a></li>
 <li><a href="#217-dao">2.1.7 程序层DAO设计建议</a></li>
 <li><a href="#218">2.1.8 一个规范的建表语句示例</a></li>
@@ -51,50 +51,47 @@
 <h3 id="212"><a name="user-content-212" href="#212" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>2.1.2 表结构</h3>
 <ol>
 <li>【强制】表和列的名称必须控制在32个字符以内，表名只能使用字母、数字和下划线，一律小写。</li>
+<li>【强制】表名和字段名不能使用数据库的关键字。</li>
 <li>【强制】表名要求模块名强相关，如师资系统采用”sz”作为前缀，渠道系统采用”qd”作为前缀等。</li>
 <li>【强制】创建表时必须显式指定字符集为utf8或utf8mb4。</li>
 <li>【强制】创建表时必须显式指定表存储引擎类型，如无特殊需求，一律为InnoDB。当需要使用除InnoDB/MyISAM/Memory以外的存储引擎时，必须通过DBA审核才能在生产环境中使用。因为Innodb表支持事务、行锁、宕机恢复、MVCC等关系型数据库重要特性，为业界使用最多的MySQL存储引擎。而这是其他大多数存储引擎不具备的，因此首推InnoDB。</li>
-<li>【强制】建表必须有comment</li>
-<li>【建议】建表时关于主键：(1)强制要求主键为id，类型为int或bigint，且为<code>auto_increment(2)</code>标识表里每一行主体的字段不要设为主键，建议设为其他字段如<code>user_id</code>，<code>order_id</code>等，并建立unique key索引（可参考<code>cdb.teacher</code>表设计）。因为如果设为主键且主键值为随机插入，则会导致innodb内部page分裂和大量随机I/O，性能下降。</li>
+<li>【强制】建表必须有注释comment，包括表和字段的注释。</li>
+<li>【强制】建表时关于主键：(1)强制要求主键为id，类型为int或bigint，且为<code>auto_increment(2)</code>标识表里每一行主体的字段不要设为主键，建议设为其他字段如<code>user_id</code>，<code>order_id</code>等，并建立unique key索引（可参考<code>cdb.teacher</code>表设计）。因为如果设为主键且主键值为随机插入，则会导致innodb内部page分裂和大量随机I/O，性能下降。</li>
 <li>【建议】核心表（如用户表，金钱相关的表）必须有行数据的创建时间字段<code>create_time</code>和最后更新时间字段<code>update_time</code>，便于查问题。</li>
-<li>【建议】表中所有字段必须都是<code>NOT NULL</code>属性，业务可以根据需要定义<code>DEFAULT</code>值。因为使用NULL值会存在每一行都会占用额外存储空间、数据迁移容易出错、聚合函数计算结果偏差等问题。</li>
+<li>【强制】表中所有字段必须都是<code>NOT NULL</code>属性，需要定义<code>DEFAULT</code>值。因为使用NULL值会存在每一行都会占用额外存储空间、数据迁移容易出错、聚合函数计算结果偏差等问题。</li>
 <li>【建议】建议对表里的<code>blob</code>、<code>text</code>等大字段，垂直拆分到其他表里，仅在需要读这些对象的时候才去select。</li>
 <li>【建议】反范式设计：把经常需要join查询的字段，在其他表里冗余一份。如<code>user_name</code>属性在<code>user_account</code>，<code>user_login_log</code>等表里冗余一份，减少join查询。</li>
 <li>【强制】中间表用于保留中间结果集，名称必须以<code>tmp_</code>开头。备份表用于备份或抓取源表快照，名称必须以<code>bak_</code>开头。中间表和备份表定期清理。</li>
 <li>【强制】对于超过100W行的大表进行<code>alter table</code>，必须经过DBA审核，并在业务低峰期执行。因为<code>alter table</code>会产生表锁，期间阻塞对于该表的所有写入，对于业务可能会产生极大影响。</li>
+<li>【强制】在多条语句修改同一张表的表结构时，合成一条SQL语句。</li>
 </ol>
 <h3 id="213"><a name="user-content-213" href="#213" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>2.1.3 列数据类型优化</h3>
 <ol>
+<li>【强制】自增列的类型必须为int或者bigint。</li>
 <li>【建议】表中的自增列（<code>auto_increment</code>属性），推荐使用<code>bigint</code>类型。因为无符号<code>int</code>存储范围为<code>-2147483648~2147483647</code>（大约21亿左右），溢出后会导致报错。</li>
+<li>【强制】自增列要为unsigned无符号型。新建表的自增列的值指定为1。</li>
 <li>【建议】业务中选择性很少的状态<code>status</code>、类型<code>type</code>等字段推荐使用<code>tinytint</code>或者<code>smallint</code>类型节省存储空间。</li>
 <li>【建议】业务中IP地址字段推荐使用<code>int</code>类型，不推荐用<code>char(15)</code>。因为<code>int</code>只占4字节，可以用如下函数相互转换，而<code>char(15)</code>占用至少15字节。一旦表数据行数到了1亿，那么要多用1.1G存储空间。 SQL：<code>select inet_aton('192.168.2.12'); select inet_ntoa(3232236044);</code> PHP: <code>ip2long(‘192.168.2.12’); long2ip(3530427185);</code></li>
-<li>【建议】不推荐使用<code>enum</code>，<code>set</code>。 因为它们浪费空间，且枚举值写死了，变更不方便。推荐使用<code>tinyint</code>或<code>smallint</code>。</li>
+<li>【强制】不能使用<code>enum</code>，<code>set</code>，<code>bit</code>。 因为它们浪费空间，且枚举值写死了，变更不方便。推荐使用<code>tinyint</code>或<code>smallint</code>。</li>
 <li>【建议】不推荐使用<code>blob</code>，<code>text</code>等类型。它们都比较浪费硬盘和内存空间。在加载表数据时，会读取大字段到内存里从而浪费内存空间，影响系统性能。建议和PM、RD沟通，是否真的需要这么大字段。Innodb中当一行记录超过8098字节时，会将该记录中选取最长的一个字段将其768字节放在原始page里，该字段余下内容放在<code>overflow-page</code>里。不幸的是在<code>compact</code>行格式下，原始<code>page</code>和<code>overflow-page</code>都会加载。</li>
 <li>【建议】存储金钱的字段，建议用<code>int</code>，程序端乘以100和除以100进行存取。因为<code>int</code>占用4字节，而<code>double</code>占用8字节，空间浪费。</li>
 <li>【建议】文本数据尽量用<code>varchar</code>存储。因为<code>varchar</code>是变长存储，比<code>char</code>更省空间。MySQL server层规定一行所有文本最多存65535字节，因此在utf8字符集下最多存21844个字符，超过会自动转换为<code>mediumtext</code>字段。而<code>text</code>在utf8字符集下最多存21844个字符，<code>mediumtext</code>最多存2^24/3个字符，<code>longtext</code>最多存2^32个字符。一般建议用<code>varchar</code>类型，字符数不要超过2700。</li>
-<li>【建议】时间类型尽量选取<code>timestamp</code>。因为<code>datetime</code>占用8字节，<code>timestamp</code>仅占用4字节，但是范围为<code>1970-01-01 00:00:01</code>到<code>2038-01-01 00:00:00</code>。更为高阶的方法，选用<code>int</code>来存储时间，使用SQL函数<code>unix_timestamp()</code>和<code>from_unixtime()</code>来进行转换。</li>
+<li>【强制】时间类型选取<code>timestamp</code>。因为<code>datetime</code>占用8字节，<code>timestamp</code>仅占用4字节，但是范围为<code>1970-01-01 00:00:01</code>到<code>2038-01-01 00:00:00</code>。更为高阶的方法，选用<code>int</code>来存储时间，使用SQL函数<code>unix_timestamp()</code>和<code>from_unixtime()</code>来进行转换。</li>
 </ol>
-<p>详细存储大小参加下图：</p>
-<p><img alt="MySQL数据类型存储大小" src="/static/pics/mysql_datatype.png" /></p>
+
 <h3 id="214"><a name="user-content-214" href="#214" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>2.1.4 索引设计</h3>
 <ol>
 <li>【强制】InnoDB表必须主键为<code>id int/bigint auto_increment</code>,且主键值禁止被更新。</li>
-<li>【建议】主键的名称以“<code>pk_</code>”开头，唯一键以“<code>uk_</code>”或“<code>uq_</code>”开头，普通索引以“<code>idx_</code>”开头，一律使用小写格式，以表名/字段的名称或缩写作为后缀。</li>
-<li>【强制】InnoDB和MyISAM存储引擎表，索引类型必须为<code>BTREE</code>；MEMORY表可以根据需要选择<code>HASH</code>或者<code>BTREE</code>类型索引。</li>
-<li>【强制】单个索引中每个索引记录的长度不能超过64KB。</li>
-<li>【建议】单个表上的索引个数不能超过7个。</li>
+<li>【强制】主键的名称以“<code>pk_</code>”开头，唯一键以“<code>uniq_</code>”开头，普通索引以“<code>idx_</code>”开头，一律使用小写格式，以表名/字段的名称或缩写作为后缀。</li>
+<li>【强制】InnoDB存储引擎表，索引类型必须为<code>BTREE</code>。</li>
+<li>【强制】在单个联合索引中，索引字段的最大个数不能超过5个。</li>
+<li>【强制】单个表上的索引个数不能超过5个。</li>
 <li>【建议】在建立索引时，多考虑建立联合索引，并把区分度最高的字段放在最前面。如列<code>userid</code>的区分度可由<code>select count(distinct userid)</code>计算出来。</li>
 <li>【建议】在多表join的SQL里，保证被驱动表的连接列上有索引，这样join执行效率最高。</li>
 <li>【建议】建表或加索引时，保证表里互相不存在冗余索引。对于MySQL来说，如果表里已经存在<code>key(a,b)</code>，则<code>key(a)</code>为冗余索引，需要删除。</li>
 </ol>
-<h3 id="215"><a name="user-content-215" href="#215" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>2.1.5 分库分表、分区表</h3>
+<h3 id="215"><a name="user-content-215" href="#215" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>2.1.5 分库分表</h3>
 <ol>
-<li>【强制】分区表的分区字段（<code>partition-key</code>）必须有索引，或者是组合索引的首列。</li>
-<li>【强制】单个分区表中的分区（包括子分区）个数不能超过1024。</li>
-<li>【强制】上线前RD或者DBA必须指定分区表的创建、清理策略。</li>
-<li>【强制】访问分区表的SQL必须包含分区键。</li>
-<li>【建议】单个分区文件不超过2G，总大小不超过50G。建议总分区数不超过20个。</li>
-<li>【强制】对于分区表执行<code>alter table</code>操作，必须在业务低峰期执行。</li>
 <li>【强制】采用分库策略的，库的数量不能超过1024</li>
 <li>【强制】采用分表策略的，表的数量不能超过4096</li>
 <li>【建议】单个分表不超过500W行，ibd文件大小不超过2G，这样才能让数据分布式变得性能更佳。</li>
@@ -103,6 +100,7 @@
 <h3 id="216"><a name="user-content-216" href="#216" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>2.1.6 字符集</h3>
 <ol>
 <li>【强制】数据库本身库、表、列所有字符集必须保持一致，为<code>utf8</code>或<code>utf8mb4</code>。</li>
+<li>【强制】不允许在字段级别设置字符集。</li>
 <li>【强制】前端程序字符集或者环境变量中的字符集，与数据库、表的字符集必须一致，统一为<code>utf8</code>。</li>
 </ol>
 <h3 id="217-dao"><a name="user-content-217-dao" href="#217-dao" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>2.1.7 程序层DAO设计建议</h3>
@@ -151,7 +149,7 @@
 <li>【建议】事务里批量更新数据需要控制数量，进行必要的sleep，做到少量多次。</li>
 <li>【强制】事务涉及的表必须全部是innodb表。否则一旦失败不会全部回滚，且易造成主从库同步终端。</li>
 <li>【强制】写入和事务发往主库，只读SQL发往从库。</li>
-<li>【强制】除静态表或小表（100行以内），DML语句必须有where条件，且使用索引查找。</li>
+<li>【强制】DML语句必须有where条件。</li>
 <li>【强制】生产环境禁止使用<code>hint</code>，如<code>sql_no_cache</code>，<code>force index</code>，<code>ignore key</code>，<code>straight join</code>等。因为<code>hint</code>是用来强制SQL按照某个执行计划来执行，但随着数据量变化我们无法保证自己当初的预判是正确的，因此我们要相信MySQL优化器！</li>
 <li>【强制】where条件里等号左右字段类型必须一致，否则无法利用索引。</li>
 <li>【建议】<code>SELECT|UPDATE|DELETE|REPLACE</code>要有WHERE子句，且WHERE子句的条件必需使用索引查找。</li>
@@ -159,7 +157,7 @@
 <li>【强制】WHERE 子句中禁止只使用全模糊的LIKE条件进行查找，必须有其他等值或范围查询条件，否则无法利用索引。</li>
 <li>【建议】索引列不要使用函数或表达式，否则无法利用索引。如<code>where length(name)='Admin'</code>或<code>where user_id+2=10023</code>。</li>
 <li>【建议】减少使用or语句，可将or语句优化为union，然后在各个where条件上建立索引。如where a=1 or b=2优化为where a=1… union …where b=2, key(a),key(b)</li>
-<li>【建议】分页查询，当limit起点较高时，可先用过滤条件进行过滤。如<code>select a,b,c from t1 limit 10000,20;</code>优化为: <code>select a,b,c from t1 where id&gt;10000 limit 20;</code>。</li>
+<li>【强制】在一个修改语句中，修改的最大行数是10000条。</li>
 </ol>
 <h3 id="222"><a name="user-content-222" href="#222" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>2.2.2 多表连接</h3>
 <ol>
@@ -175,6 +173,7 @@
 <li>【建议】事务中<code>INSERT|UPDATE|DELETE|REPLACE</code>语句操作的行数控制在2000以内，以及WHERE子句中IN列表的传参个数控制在500以内。</li>
 <li>【建议】批量操作数据时，需要控制事务处理间隔时间，进行必要的sleep，一般建议值5-10秒。</li>
 <li>【建议】对于有<code>auto_increment</code>属性字段的表的插入操作，并发需要控制在200以内。</li>
+<li>【强制】在插入语句中，需要显式写上插入的字段名称。</li>
 <li>【强制】程序设计必须考虑“数据库事务隔离级别”带来的影响，包括脏读、不可重复读和幻读。线上建议事务隔离级别为<code>repeatable-read</code>。</li>
 <li>【建议】事务里包含SQL不超过5个（支付业务除外）。因为过长的事务会导致锁数据较久，MySQL内部缓存、连接消耗过多等雪崩问题。</li>
 <li>【建议】事务里更新语句尽量基于主键或<code>unique key</code>，如<code>update … where id=XX</code>; 否则会产生间隙锁，内部扩大锁定范围，导致系统性能下降，产生死锁。</li>
@@ -183,13 +182,15 @@
 </ol>
 <h3 id="224"><a name="user-content-224" href="#224" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>2.2.4 排序和分组</h3>
 <ol>
+<li>【强制】禁止使用order by rand。</li>
 <li>【建议】减少使用<code>order by</code>，和业务沟通能不排序就不排序，或将排序放到程序端去做。<code>order by</code>、<code>group by</code>、<code>distinct</code>这些语句较为耗费CPU，数据库的CPU资源是极其宝贵的。</li>
 <li>【建议】<code>order by</code>、<code>group by</code>、<code>distinct</code>这些SQL尽量利用索引直接检索出排序好的数据。如<code>where a=1 order by</code>可以利用<code>key(a,b)</code>。</li>
 <li>【建议】包含了<code>order by</code>、<code>group by</code>、<code>distinct</code>这些查询的语句，where条件过滤出来的结果集请保持在1000行以内，否则SQL会很慢。</li>
 </ol>
 <h3 id="225-sql"><a name="user-content-225-sql" href="#225-sql" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>2.2.5 线上禁止使用的SQL语句</h3>
 <ol>
-<li>【高危】禁用<code>update|delete t1 … where a=XX limit XX;</code> 这种带limit的更新语句。因为会导致主从不一致，导致数据错乱。建议加上<code>order by PK</code>。</li>
+<li>【高危】禁止在DML语句中使用LIMIT。禁用<code>update|delete t1 … where a=XX limit XX;</code> 这种带limit的更新语句。因为会导致主从不一致，导致数据错乱。</li>
+<li>【强制】禁用在DML语句中使用Order By。</li>
 <li>【高危】禁止使用关联子查询，如<code>update t1 set … where name in(select name from user where…);</code>效率极其低下。</li>
 <li>【强制】禁用procedure、function、trigger、views、event、外键约束。因为他们消耗数据库资源，降低数据库实例可扩展性。推荐都在程序端实现。</li>
 <li>【强制】禁用<code>insert into …on duplicate key update…</code>在高并发环境下，会造成主从不一致。</li>
@@ -197,3 +198,4 @@
 </ol>
 
 {% endblock content %}
+
