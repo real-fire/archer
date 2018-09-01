@@ -25,7 +25,7 @@
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/cc.png)
 
 
-* 增加抄送人功能  
+* 增加了复制监控功能  
 
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/dbamanage.png)
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/replication.png)
