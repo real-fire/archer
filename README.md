@@ -8,6 +8,11 @@
   
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/wechat.png)
 
+* 优化提交工单页面载入速度和后台逻辑，这样配置大量数据库也很快进入SQL提交页面。  
+  将同步加载改为使用AJAX后台进行异步加载。
+  
+![](https://github.com/real-fire/archer/blob/master/src/screenshots/SQLsubmit.png)
+
 
 ## 主要功能
 * 自动审核  
