@@ -24,7 +24,7 @@ from .dao import Dao
 from .const import WorkflowDict
 from .inception import InceptionDao
 from .models import users, master_config, slave_config, QueryPrivilegesApply, QueryPrivileges, QueryLog, SlowQuery, \
-    SlowQueryHistory, AliyunRdsConfig
+    SlowQueryHistory
 from .data_masking import Masking
 from .workflow import Workflow
 from .permission import role_required, superuser_required
@@ -818,12 +818,9 @@ def slowquery_review(request):
 
     # 判断是RDS还是其他实例
     cluster_info = master_config.objects.get(cluster_name=cluster_name)
-    if len(AliyunRdsConfig.objects.filter(cluster_name=cluster_name)) > 0:
-        if settings.ALIYUN_RDS_MANAGE:
-            # 调用阿里云慢日志接口
-            result = aliyun_rds_slowquery_review(request)
-        else:
-            raise Exception('未开启rds管理，无法查看rds数据！')
+    if settings.ALIYUN_RDS_MANAGE:
+        # 调用阿里云慢日志接口
+        result = aliyun_rds_slowquery_review(request)
     else:
         StartTime = request.POST.get('StartTime')
         EndTime = request.POST.get('EndTime')
@@ -923,12 +920,9 @@ def slowquery_review_history(request):
 
     # 判断是RDS还是其他实例
     cluster_info = master_config.objects.get(cluster_name=cluster_name)
-    if len(AliyunRdsConfig.objects.filter(cluster_name=cluster_name)) > 0:
-        if settings.ALIYUN_RDS_MANAGE:
-            # 调用阿里云慢日志接口
-            result = aliyun_rds_slowquery_review_history(request)
-        else:
-            raise Exception('未开启rds管理，无法查看rds数据！')
+    if settings.ALIYUN_RDS_MANAGE:
+        # 调用阿里云慢日志接口
+        result = aliyun_rds_slowquery_review_history(request)
     else:
         StartTime = request.POST.get('StartTime')
         EndTime = request.POST.get('EndTime')
@@ -945,7 +939,7 @@ def slowquery_review_history(request):
             # 获取慢查明细数据
             slowsql_record_obj = SlowQueryHistory.objects.filter(
                 hostname_max=(cluster_info.master_host + ':' + str(cluster_info.master_port)),
-                checksum=SQLId,
+                checksum=int(SQLId),
                 ts_min__range=(StartTime, EndTime)
             ).annotate(ExecutionStartTime=F('ts_min'),  # 执行开始时间
                        DBName=F('db_max'),  # 数据库名
@@ -962,7 +956,7 @@ def slowquery_review_history(request):
 
             slowsql_obj_count = SlowQueryHistory.objects.filter(
                 hostname_max=(cluster_info.master_host + ':' + str(cluster_info.master_port)),
-                checksum=SQLId,
+                checksum=int(SQLId),
                 ts_min__range=(StartTime, EndTime)
             ).count()
         else:
@@ -1021,3 +1015,19 @@ def slowquery_review_history(request):
         # 返回查询结果
     return HttpResponse(json.dumps(result, cls=ExtendJSONEncoder, bigint_as_string=True),
                         content_type='application/json')
+
+
+# 获取邮件抄送人
+@csrf_exempt
+def getEmailCc(request):
+    result = {'status': 0, 'msg': 'ok', 'data': []}
+
+    try:
+        listDb = [username['display'] for username in
+                         users.objects.exclude(role__icontains="DBA").exclude(username__icontains="root").values('username', 'display')]
+        result['data'] = listDb
+    except Exception as e:
+        result['status'] = 1
+        result['msg'] = str(e)
+
+    return HttpResponse(json.dumps(result), content_type='application/json')
