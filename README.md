@@ -20,6 +20,12 @@
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/datasource.png)
 
 
+
+* 增加抄送人功能  
+
+![](https://github.com/real-fire/archer/blob/master/src/screenshots/cc.png)
+
+
 * 所有DBA均可执行工单审核  
   工单发起人提交工单给DBA1审核，DBA2可以执行工单审核。
 
