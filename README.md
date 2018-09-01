@@ -8,17 +8,20 @@
   
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/wechat.png)
 
+
 * 优化提交工单页面载入速度和后台逻辑，这样配置大量数据库也很快进入SQL提交页面。  
   将同步加载改为使用AJAX后台进行异步加载。
   
 ![](https://github.com/real-fire/archer/blob/master/src/screenshots/SQLsubmit.png)
 
-* 所有DBA均可执行工单审核  
-  工单发起人提交工单给DBA1审核，DBA2可以执行工单审核。
 
 * 加入数据源管理  
 
+![](https://github.com/real-fire/archer/blob/master/src/screenshots/datasource.png)
 
+
+* 所有DBA均可执行工单审核  
+  工单发起人提交工单给DBA1审核，DBA2可以执行工单审核。
 
 
 ## 主要功能
