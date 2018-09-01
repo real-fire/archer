@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <h4 style="display: inline;">单子名称：<span id="editWorkflowNname">{{ workflowDetail.workflow_name }}</span></h4>
+    <h4 style="display: inline;">工单名称：<span id="editWorkflowNname">{{ workflowDetail.workflow_name }}</span></h4>
     &nbsp;&nbsp;&nbsp;
     <input type="hidden" id="workflowDetail_id" name="workflowid" value="{{ workflowDetail.id }}">
     <input type="hidden" id="editSqlContent" value="{{ workflowDetail.sql_content }}"/>
@@ -69,6 +69,8 @@
         </tbody>
     </table>
     <br>
+
+
     <!-- 自定义操作按钮-->
     <div id="detail-toolbar" class="btn-group right">
         <button id="expandAllRows" class="btn btn-default navbar-btn" type="button">展开全部</button>
@@ -93,7 +95,6 @@
             </tr>
             </tbody>
         </table>
-        <br>
     {% endif %}
     {% if workflowDetail.status == '定时执行' %}
         <br>
@@ -113,11 +114,10 @@
             </tr>
             </tbody>
         </table>
-        <br>
     {% endif %}
-
+    <br>
     {% if workflowDetail.status == '等待审核人审核' %}
-        {% if loginUser in listAllReviewMen %}
+        {% if loginUser in listAllReviewMen or loginUser in listDBA %}
             <textarea id="remark" name="remark" class="form-control" data-name="审核备注"
                       placeholder="请填写驳回原因" rows=3></textarea>
             <br>
@@ -145,19 +145,46 @@
             </form>
         {% endif %}
 
-    {% elif workflowDetail.status == '审核通过' %}
+    {% elif workflowDetail.status == '审核通过' and executeDB.is_product == 0 %}
         {% if loginUserOb.role == 'DBA' %}
             <textarea id="remark" name="remark" class="form-control" data-name="审核备注"
                       placeholder="请填写驳回原因" rows=3></textarea>
             <br>
 
+            <form id="form-cancel" action="/cancel/" method="post" style="display:inline-block;">
+                {% csrf_token %}
+                <input type="hidden" name="workflowid" value="{{ workflowDetail.id }}">
+                <input type="hidden" id="audit_remark" name="audit_remark" value="">
+                <input type="button" id="btnCancel" class="btn btn-default" value="终止流程"/>
+            </form>
+
+        {% elif loginUser == workflowDetail.engineer %}
             <form id="from-execute" action="/execute/" method="post" style="display:inline-block;">
                 {% csrf_token %}
                 <input type="hidden" name="workflowid" value="{{ workflowDetail.id }}">
                 <input type="button" id="btnExecute" class="btn btn-danger"
                        value="立即执行"/>
             </form>
-            <input type="button" class="btn btn-info" data-toggle="modal" data-target="#cronComfirm" value="定时执行"/>
+            <form id="form-cancel" action="/cancel/" method="post" style="display:inline-block;">
+                {% csrf_token %}
+                <input type="hidden" name="workflowid" value="{{ workflowDetail.id }}">
+                <input type="hidden" id="audit_remark" name="audit_remark" value="">
+                <input type="submit" onclick="loading(this)" class="btn btn-default" value="终止流程"/>
+            </form>
+        {% endif %}
+
+
+    {% elif workflowDetail.status == '审核通过' and executeDB.is_product == 1 %}
+        {% if loginUserOb.role == 'DBA' %}
+            <textarea id="remark" name="remark" class="form-control" data-name="审核备注"
+                      placeholder="请填写驳回原因" rows=3></textarea>
+            <br>
+            <form id="from-execute" action="/execute/" method="post" style="display:inline-block;">
+                {% csrf_token %}
+                <input type="hidden" name="workflowid" value="{{ workflowDetail.id }}">
+                <input type="button" id="btnExecute" class="btn btn-danger"
+                       value="立即执行"/>
+            </form>
             <form id="form-cancel" action="/cancel/" method="post" style="display:inline-block;">
                 {% csrf_token %}
                 <input type="hidden" name="workflowid" value="{{ workflowDetail.id }}">
@@ -173,6 +200,7 @@
                 <input type="submit" onclick="loading(this)" class="btn btn-default" value="终止流程"/>
             </form>
         {% endif %}
+
 
     {% elif workflowDetail.status == '定时执行' %}
         {% if loginUserOb.role == 'DBA' %}
@@ -401,7 +429,7 @@
                 strictSearch: false,                //是否全匹配搜索
                 showColumns: true,                  //是否显示所有的列（选择显示的列）
                 showRefresh: false,                  //是否显示刷新按钮
-                minimumCountColumns: 1,             //最少允许的列数
+                minimumCountColumns: 2,             //最少允许的列数
                 clickToSelect: false,                //是否启用点击选中行
                 uniqueId: "id",                     //每一行的唯一标识，一般为主键列
                 showToggle: true,                   //是否显示详细视图和列表视图的切换按钮
@@ -442,11 +470,8 @@
                         else {
                             return value
                         }
-                    }
-                }, {
-                    title: '完整SQL内容',
-                    field: 'SQL',
-                    visible: false
+                    },
+                    sortable: true
                 }, {
                     title: '审核状态',
                     field: 'errlevel',

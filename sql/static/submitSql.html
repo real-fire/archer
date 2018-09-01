@@ -7,6 +7,8 @@
             <form id="form-submitsql" action="/autoreview/" method="post" class="form-horizontal" role="form">
                 {% csrf_token %}
                 <input type="hidden" id="workflowid" name="workflowid"/>
+                <!--邮件抄送人-->
+                <input type="hidden" id="email_cc_list" name="email_cc_list"/>
                 <div class="col-md-9 column">
                     <pre id="sql_content_editor" style="min-height:400px"></pre>
                 </div>
@@ -28,18 +30,22 @@
                         <select id="cluster_name" name="cluster_name"
                                 class="selectpicker show-tick form-control bs-select-hidden" data-name="要上线的集群"
                                 data-live-search="true" data-placeholder="请选择要上线的集群:" required>
-                            <option value="is-empty" disabled="" selected="selected">请选择要上线的集群:</option>
-                            {% for cluster_name,dbs in dictAllClusterDb.items %}
-                                <option value="{{ cluster_name }}">{{ cluster_name }}集群 (包含db：
-                                    {% for db in dbs %}
-                                        {{ db }}{% if not forloop.last %},{% endif %}
-                                    {% endfor %}
-                                    )
+                            <option value="is-empty" disabled="" selected="selected">请选择要上线的数据库:</option>
+                            {% for cluster_name in dictAllClusterDb.items %}
+                                <option value="{{ cluster_name.0 }}" is_product_mark="{{cluster_name.1}}" >{{ cluster_name.0 }}
                                 </option>
                             {% endfor %}
 
                         </select>
                     </div>
+
+                    <div class="form-group">
+                        <select id="db_name" name="db_name" class="form-control selectpicker show-tick bs-select-hidden"
+                                data-live-search="true" data-placeholder="请选择数据库:" >
+                            <option value="is-empty" disabled="" selected="selected">查看数据库:</option>
+                        </select>
+                    </div>
+
                     <div class="form-group">
                         <select id="is_backup" name="is_backup"
                                 class="selectpicker show-tick form-control bs-select-hidden" data-name="是否选择备份"
@@ -49,48 +55,49 @@
                             <option value="否">否</option>
                         </select>
                     </div>
+
                     <div class="form-group">
-                        <select id="review_man" name="review_man"
-                                class="selectpicker show-tick form-control bs-select-hidden" data-name="审核人"
-                                data-live-search="true" data-placeholder="请选择RD审核人:" required>
-                            <option value="is-empty" disabled="" selected="selected">请选择审核人:</option>
-                            {% for man in reviewMen %}
-                                <option value="{{ man }}">{{ man }}</option>
-                            {% endfor %}
+                        <select id="email_cc_multiple" name="cc_name" data-live-search="true" multiple="multiple" data-actions-box="true"
+                                class="form-control selectpicker show-tick bs-select-hidden ">
+                            <option value="is-empty" disabled="" selected="selected">请选择抄送人:</option>
                         </select>
                     </div>
-                    <!--增加副审核人选项-->
+
                     <div class="form-group">
-                        <div class="panel-group" id="accordion">
-                            <div class="panel panel-default">
-                                <div class="panel-heading">
-                                    <h4 class="panel-title">
-                                        <a data-toggle="collapse"
-                                           data-parent="#accordion"
-                                           href="#collapseOne">
-                                            <i class="glyphicon-plus
-                                        glyphicon"></i>
-                                            增加副审核人（可选)
-                                        </a>
-                                    </h4>
-                                </div>
-                                <div id="collapseOne" class="panel-collapse
-                            collapse">
-                                    <div class="panel-body" style="margin-left:
-                                25px">
-                                        {% for man in reviewMen %}
-                                            <div class="radio" id="{{ man }}">
-                                                <input type="radio" id="radio1"
-                                                       name="sub_review_man" value="{{ man }}"/>
-                                                <label for="radio1"> {{ man }}
-                                                </label>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <select id="is_data_modified" name="is_data_modified" onchange="checkProductMark(this.value)"
+                                class="selectpicker show-tick form-control bs-select-hidden" data-name="是否数据订正"
+                                data-placeholder="请选择是否是数据订正:" required>
+                            <option value="is-empty" disabled="" selected="selected">请选择是否是数据订正:</option>
+                            <option value=1>是</option>
+                            <option value=0>否</option>
+                        </select>
                     </div>
+
+                    
+                        <div class="form-group hidden" id='yes-div'>
+                            <select id="review_man_auditor" name="review_man_auditor"
+                                    class="selectpicker show-tick form-control bs-select-hidden" data-name="审核人(组长)"
+                                    data-live-search="true" data-placeholder="请选择RD审核人: " >
+                                <option value="is-empty" disabled="" selected="selected">请选择审核人(组长):</option>
+                                {% for team_man in reviewMen_auditor %}
+                                    <option value="{{ team_man }}">{{ team_man }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+
+                        <div class="form-group hidden" id='no-div'>
+                            <select id="review_man_DBA" name="review_man_DBA"
+                                    class="selectpicker show-tick form-control bs-select-hidden" data-name="审核人(DBA)"
+                                    data-live-search="true" data-placeholder="请选择RD审核人:" >
+                                <option value="is-empty" disabled="" selected="selected">请选择审核人(DBA):</option>
+                                {% for man in reviewMen_DBA %}
+                                    <option value="{{ man }}">{{ man }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+
                     <div class="form-group">
                         <input id="btn-format" type="button" class="btn btn-info" value="美化"/>
                         <input type="button" id="btn-autoreview" class="btn btn-danger" value="SQL检测"/>
@@ -100,6 +107,7 @@
                 </div>
             </form>
         </div>
+<div class="alert alert-danger">提示：在执行时，不能将 DML 语句及 DDL 语句放在一起执行，否则会因为备份解析binlog时由于表结构的变化出现不可预知的错误，如果要有同时执行 DML 及 DDL，则请分开多个语句块儿来执行，如果真的这样做了，Inception 会报错，不会去执行。</div>
         <!-- 审核结果 -->
         <table id="inception-result" data-toggle="table" class="table table-striped table-hover"
                style="display: none"></table>
@@ -119,7 +127,6 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-info" data-dismiss="modal">取消</button>
-                        <button id="submitsqlcomfirm" type="button" class="btn btn-danger" data-dismiss="modal">确定提交
                         </button>
                     </div>
                 </div>
@@ -143,17 +150,72 @@
 
     <!--upload -->
     <script>
-      //初始化上传控件
+
+        // 在测试、beta环境，对于非数据订正，如果没有选择审核人，报错。
+        function submitSQLdata() {
+            var check_data_modified = $("#is_data_modified").val()
+            var check_review_man_DBA = $("#review_man_DBA").val()
+            if(check_data_modified == 0 && check_review_man_DBA == null)
+            {
+            alert("请选择审核人！")
+            return;
+            }
+        }
+
+        $("#email_cc_multiple").selectpicker({
+            noneSelectedText : '请选择抄送人：',
+            actionsBox: true, //在下拉选项添加选中所有和取消选中的按钮
+            countSelectedText: "已选中{0}项",
+            selectedTextFormat: "count > 5"
+        });
+
+        // 根据是否是数据订正，选择不同的审核人
+        $('#is_data_modified').change(function(){
+			var val = $('#is_data_modified').val();
+
+			if(val==1){
+				$('#yes-div').removeClass("hidden");
+				$('#no-div').addClass("hidden");
+			}else{
+				$('#no-div').removeClass("hidden");
+				$('#yes-div').addClass("hidden");
+			}
+
+            // 获取抄送人列表
+            var email_cc_multiple = $("#email_cc_multiple").val();
+                if (email_cc_multiple != null){
+                    if (email_cc_multiple.length > 1) {
+                        var db_list = email_cc_multiple.join(",");
+                    }
+                    else {
+                        var db_list = email_cc_multiple.toString()
+                    }
+                }
+                $("#email_cc_list").val(db_list);
+		});
+
+
+        // 对于测试环境的数据订正请求，取消审核人
+        function checkProductMark(val){
+                        var val_data_modified = $('#is_data_modified').val();
+                        val_product_mark = $("option[value='"+$('#cluster_name').val()+"']","#cluster_name").attr("is_product_mark");
+
+                        // alert("data_modified值已更改。新值是：" + val_data_modified + "\n" + "product_mark已更改。新值是：" + val_product_mark);
+                        if(val_data_modified==1 && val_product_mark==0){
+                                $('#yes-div').addClass("hidden");
+                                $('#no-div').addClass("hidden");
+                        }
+                };
+
+        //初始化上传控件
         function init_upload() {
             $("#sql-upload").fileinput({
                 language: 'zh',
                 allowedFileExtensions: ['sql'],//接收的文件后缀
                 showCaption: true,//是否显示标题
-                initialCaption: '仅支持10M内的SQL文件',
-                defaultPreviewContent: '仅支持10M内的SQL文件',
+                initialCaption: '仅支持后缀名为sql的文件',
                 showUpload: false,     //不显示上传按钮
-                showPreview: false,    // 不显示预览,
-                maxFileSize: 10240
+                showPreview: false    // 不显示预览,
             }).on('fileloaded', function () {
                 loadsql();
             })
@@ -190,6 +252,7 @@
     <script>
         // 集群变更获取数据库补全提示
         $("#cluster_name").change(function () {
+            sessionStorage.setItem('sql_query_cluster_name', $("#cluster_name").val());
             //将数据通过ajax提交给获取db_name
             $.ajax({
                 type: "post",
@@ -205,7 +268,10 @@
                     if (data.status === 0) {
                         var result = data.data;
                         var dbs = [];
+                        $("#db_name").empty();
                         for (var i = 0; i < result.length; i++) {
+                            var name = "<option value=\"" + result[i] + "\">" + result[i] + "</option>";
+                            $("#db_name").append(name);
                             dbs.push({
                                 name: result[i],
                                 value: result[i],
@@ -214,6 +280,9 @@
                                 score: '100'
                             })
                         }
+                        $("#db_name").prepend("<option value=\"is-empty\" disabled=\"\" selected=\"selected\">查看数据库:</option>");
+                        $('#db_name').selectpicker('render');
+                        $('#db_name').selectpicker('refresh');
                         //自动补全提示
                         setCompleteData(dbs)
                     } else {
@@ -224,7 +293,80 @@
                     alert(errorThrown);
                 }
             });
+
+            $.ajax({
+                type: "post",
+                url: "/getEmailCc/",
+                dataType: "json",
+                data: {
+                    cluster_name: $("#cluster_name").val()
+                },
+                complete: function () {
+                },
+                success: function (data) {
+                    if (data.status === 0) {
+
+
+                        var result = data.data;
+                        $("#cc_name").empty();
+                        $("#email_cc_multiple").empty();
+                        for (var i = 0; i < result.length; i++) {
+                            var name = "<option value=\"" + result[i] + "\">" + result[i] + "</option>";
+                            $("#cc_name").append(name);
+                            $("#email_cc_multiple").append(name);
+                        }
+                        $('#cc_name').append("<option value=\"is-empty\" disabled=\"\" selected=\"selected\">请选择抄送人:</option>\n");
+                        $('#cc_name').selectpicker('render');
+                        $('#cc_name').selectpicker('refresh');
+                        $('#email_cc_multiple').selectpicker('render');
+                        $('#email_cc_multiple').selectpicker('refresh');
+                    } else {
+                        alert("status: " + data.status + "\nmsg: " + data.msg + data.data);
+                    }
+                },
+                error: function (XMLHttpRequest, textStatus, errorThrown) {
+                    alert(errorThrown);
+                }
+            });
         });
+
+        //数据库变更获取表名称
+        $("#db_name").change(function () {
+            //将数据通过ajax提交给获取db_name
+            $.ajax({
+                type: "post",
+                url: "/getTableNameList/",
+                dataType: "json",
+                data: {
+                    cluster_name: $("#cluster_name").val(),
+                    db_name: $("#db_name").val(),
+                    is_master: true
+                },
+                complete: function () {
+                },
+                success: function (data) {
+                    if (data.status === 0) {
+                        var result = data.data;
+                        $("#table_name").empty();
+                        for (var i = 0; i < result.length; i++) {
+                            var name = "<option>" + result[i] + "</option>";
+                            $("#table_name").append(name);
+                        }
+                        $("#table_name").prepend("<option value=\"is-empty\" disabled=\"\" selected=\"selected\">查看表结构:</option>");
+                        $('#table_name').selectpicker('render');
+                        $('#table_name').selectpicker('refresh');
+                        //自动补全提示
+                        setTablesCompleteData(result)
+                    } else {
+                        alert("status: " + data.status + "\nmsg: " + data.msg + data.data);
+                    }
+                },
+                error: function (XMLHttpRequest, textStatus, errorThrown) {
+                    alert(errorThrown);
+                }
+            });
+        });
+
     </script>
     <!--validate -->
     <script>
@@ -275,6 +417,18 @@
                 var CheckErrorCount = sessionStorage.getItem('CheckErrorCount');
                 $("#CheckWarningCount").text(CheckWarningCount);
                 $("#CheckErrorCount").text(CheckErrorCount);
+
+            // 如果没有选择审核人，报错。
+            var check_data_modified = $("#is_data_modified").val();
+            var check_review_man_DBA = $("#review_man_DBA").val();
+            var check_review_man_auditor = $("#review_man_auditor").val();
+            var val_product_mark = $("option[value='"+$('#cluster_name').val()+"']","#cluster_name").attr("is_product_mark");
+            if(check_review_man_auditor == null && check_review_man_DBA == null)
+            {
+            alert("请选择审核人！")
+            return;
+            }
+
                 if (CheckWarningCount > 0 || CheckErrorCount > 0) {
                     $('#submitComfirm').modal('show');
                 }
@@ -284,6 +438,7 @@
                     $('input[type=button]').prop('disabled', true);
                 }
             }
+
         });
 
         $("#submitsqlcomfirm").click(function () {
@@ -308,10 +463,13 @@
             var review_man = $(this).val();
             $("div#" + review_man).hide();
         });
+
+
     </script>
     <!--init -->
     <script>
         $(document).ready(function () {
+
             // 初始化上传控件
             init_upload();
             // 提示信息

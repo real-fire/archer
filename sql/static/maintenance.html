@@ -1,0 +1,23 @@
+{% extends "base_maintenance.html" %}
+
+{% block content %}
+    <!-- 自定义操作按钮-->
+    <!-- 只有DBA才可以管理数据源 -->
+    <div id="toolbar" class="form-inline ">
+        <div class="form-group">
+            <button id="btn_add" type="button" class="btn btn-default"
+                    onclick="window.location.href='/adddatasource/'">
+                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                增加数据源
+            </button>
+        </div>
+    </div>
+
+    <!-- 数据源列表的表格-->
+    <div class="table-responsive">
+        <table id="sqlaudit-list" data-toggle="table" class="table table-striped table-hover" data-click-to-select="true"
+               style="table-layout:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+        </table>
+    </div>
+
+{% endblock content %}

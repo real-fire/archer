@@ -38,12 +38,12 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <select id="cluster_name" name="cluster_name"
+                        <select id="cluster_name" name="cluster_name" 
                                 class="selectpicker show-tick form-control bs-select-hidden" data-live-search="true"
                                 data-placeholder="请选择集群:" required>
                             <option value="is-empty" disabled="" selected="selected">请选择集群:</option>
-                            {% for cluster_name in listAllClusterName %}
-                                <option value="{{ cluster_name }}">{{ cluster_name }}</option>
+                            {% for cluster_name, info in dictAllClusterDb.items %}
+                                <option value="{{ cluster_name }}" is_product_mark="{{info}}">{{ cluster_name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -82,16 +82,14 @@
                         <select id="limit_num" name="limit_num"
                                 class="form-control selectpicker show-tick bs-select-hidden ">
                             <option value="is-empty" disabled="" selected="selected">请选择查询限制行数:</option>
-                            <option value=100>100</option>
-                            <option value=500>500</option>
-                            <option value=1000>1000</option>
+                            <option value=10>10</option>
                         </select>
                     </div>
                     <!--审批流程-->
                     <div id="div-workflow_auditors" class="form-group">
                         <p class="bg-primary">&nbsp&nbsp&nbsp&nbsp审批流程：<b id="workflow_auditors">{{ auditors }}</b></p>
                     </div>
-                    <p class="text-info">提示：权限审核通过后即可进行在线查询，请耐心等待。</p>
+                    <p class="text-info">提示：生产数据库可以查询的数据条目为10条。</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
@@ -341,6 +339,19 @@
             var m = d.getMonth() + 1;
             return d.getFullYear() + '-' + m + '-' + d.getDate();
         }
+
+        // 对于生产数据库，可以查询的数据条目为10条；对于测试、beta环境，可以查询的数据条目为10、100、500条。
+        function checkProductMark(val){
+                        val_product_mark = $("option[value='"+$('#cluster_name').val()+"']","#cluster_name").attr("is_product_mark");
+
+                        // alert("product_mark已更改。新值是：" + val_product_mark);
+                        if(val_product_mark==0){
+                                $('#limit_num').append("<option value=100>100</option>\n");
+                                $('#limit_num').append("<option value=500>500</option>\n");
+                                $('#limit_num').selectpicker('render');
+                                $('#limit_num').selectpicker('refresh');
+                        }
+                };
 
         //提交参数校验
         function applyvalidate() {
